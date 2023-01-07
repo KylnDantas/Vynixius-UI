@@ -1,3 +1,165 @@
+local function UIModule()
+  -- Services
+
+local TS = game:GetService("TweenService")
+local Players = game:GetService("Players")
+
+-- Variables
+
+local Plr = Players.LocalPlayer
+local Mouse = Plr:GetMouse()
+
+local UI = {
+    Color = {
+        Add = function(c1, c2)
+            local r, g, b = c1.R + c2.R, c1.G + c2.G, c1.B + c2.B
+            return Color3.fromRGB(math.min(r * 255, 255), math.min(g * 255, 255), math.min(b * 255, 255))
+        end,
+        Sub = function(c1, c2)
+            local r, g, b = c1.R - c2.R, c1.G - c2.G, c1.B - c2.B
+            return Color3.fromRGB(math.max(r * 255, 0), math.max(g * 255, 0), math.max(b * 255, 0))
+        end,
+        ToFormat = function(color3)
+            return "rgb(".. math.floor(math.min(color3.R * 255, 255)).. ", ".. math.floor(math.min(color3.G * 255, 255)).. ", ".. math.floor(math.min(color3.B * 255, 255)).. ")"
+        end,
+    },
+}
+
+-- Functions
+
+UI.Create = function(class, properties, radius)
+	local instance = Instance.new(class)
+
+	for i, v in next, properties do
+		if i ~= "Parent" then
+			if typeof(v) == "Instance" then
+				v.Parent = instance
+			else
+				instance[i] = v
+			end
+		end
+	end
+
+	if radius then
+		local uicorner = Instance.new("UICorner", instance)
+		uicorner.CornerRadius = radius
+	end
+    
+	return instance
+end
+
+UI.MakeDraggable = function(obj, drag, smoothness)
+    local startPos, dragging = nil, false
+
+    drag.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            startPos = Vector2.new(Mouse.X - obj.AbsolutePosition.X, Mouse.Y - obj.AbsolutePosition.Y)
+        end
+    end)
+
+    drag.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
+
+    Mouse.Move:Connect(function()
+        if dragging then
+            TS:Create(obj, TweenInfo.new(math.clamp(smoothness, 0, 1), Enum.EasingStyle.Sine), { Position = UDim2.new(0, Mouse.X - startPos.X, 0, Mouse.Y - startPos.Y) }):Play()
+        end
+    end)
+end
+
+-- Scripts
+
+return UI
+end
+
+local function DirectoryModule()
+  -- Services
+
+local HS = game:GetService("HttpService")
+
+-- Variables
+
+local Directory = {}
+
+-- Misc Functions
+
+local function createFolder(directory)
+    if not isfolder(directory) then
+        makefolder(directory)
+    end
+end
+
+local function createBranch(tree, branch, directory)
+    for i, v in next, branch do
+        local branchName = typeof(v) == "table" and i or v
+        local branchDirectory = (directory or "").. "/".. branchName
+        
+        createFolder(branchDirectory)
+        tree[branchName] = branchDirectory
+        
+        if typeof(v) == "table" then
+            createBranch(tree, v, branchDirectory)
+        end
+    end
+end
+
+-- Functions
+
+Directory.Create = function(tree, directory)
+    local newTree = {}
+
+    for i, v in next, tree do
+        local treeDirectory = (directory and directory.. "/" or "").. (typeof(v) == "table" and i or v)
+        
+        createFolder(treeDirectory)
+        newTree.Root = treeDirectory
+        
+        if typeof(v) == "table" then
+            createBranch(newTree, v, treeDirectory)
+        end
+    end
+
+    return newTree
+end
+
+Directory.WriteConfig = function(directory, data)
+    local success = pcall(function()
+        writefile(directory, HS:JSONEncode(data))
+    end)
+
+    return success
+end
+
+Directory.DecodeConfig = function(directory)
+    local success, dConfig = pcall(function()
+        return HS:JSONDecode(readfile(directory))
+    end)
+
+    return success, success and dConfig or {}
+end
+
+Directory.GetNameFromDirectory = function(directory, noExtension)
+    local splt = directory:split([[\]])
+    local name = splt[#splt]
+    
+    if noExtension then
+        local splt2 = name:split(".")
+        
+        if #splt2 > 1 then
+            name = splt2[1]
+        end
+    end
+    
+    return name
+end
+
+return Directory
+end
+
 -- Library
 
 local Library = {
@@ -37,8 +199,8 @@ local Player = Players.LocalPlayer
 local Mouse = Player:GetMouse()
 
 local SelfModules = {
-	UI = loadstring(game:HttpGet("https://raw.githubusercontent.com/RegularVynixu/Utilities/main/UI.lua"))(),
-	Directory = loadstring(game:HttpGet("https://raw.githubusercontent.com/RegularVynixu/Utilities/main/Directory.lua"))(),
+	UI = UIModule(),
+	Directory = DirectoryModule(),
 }
 local Storage = { Connections = {}, Tween = { Cosmetic = {} } }
 
